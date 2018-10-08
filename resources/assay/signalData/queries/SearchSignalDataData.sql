@@ -17,7 +17,7 @@
 -- noinspection SqlNoDataSourceInspectionForFile
 -- This query is used to define the search criteria as used for the SignalData initial view
 SELECT
-Data.RowId,
+Run.RowId,
 --TODO: Identify search fields
-COALESCE(Data.Name, '') || COALESCE(Data.Run.RunIdentifier, '')AS Search
+COALESCE(Run.Sample, '') || COALESCE(Run.RunIdentifier, '')AS Search
 FROM Data

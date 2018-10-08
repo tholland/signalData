@@ -2,8 +2,12 @@
 <script type="text/javascript">
 
     Ext4.onReady(function() {
-        Ext4.create('LABKEY.SignalData.QualityControl', {
+        var layout = Ext4.create('LABKEY.SignalData.QualityControl', {
             renderTo: 'qctool'
+        });
+        Ext4.EventManager.onWindowResize(function(w, h) {
+            LABKEY.ext4.Util.resizeToViewport(layout, w, layout.getHeight(), 20, 35);
+
         });
     });
 

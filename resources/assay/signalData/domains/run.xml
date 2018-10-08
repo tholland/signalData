@@ -5,4 +5,15 @@
         <exp:RangeURI>http://www.w3.org/2001/XMLSchema#string</exp:RangeURI>
         <exp:Label>Run Identifier</exp:Label>
     </exp:PropertyDescriptor>
+    <exp:PropertyDescriptor>
+        <exp:Name>Run Date</exp:Name>
+        <exp:RangeURI>http://www.w3.org/2001/XMLSchema#dateTime</exp:RangeURI>
+        <exp:Label>Measurement Date</exp:Label>
+        <exp:Format>EEE, MMM d, yyyy</exp:Format>
+    </exp:PropertyDescriptor>
+    <exp:PropertyDescriptor>
+        <exp:Name>DataFile</exp:Name>
+        <exp:RangeURI>http://cpas.fhcrc.org/exp/xml#fileLink</exp:RangeURI>
+        <exp:Label>Data File</exp:Label>
+    </exp:PropertyDescriptor>
 </ap:domain>

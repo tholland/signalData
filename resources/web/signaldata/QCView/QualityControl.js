@@ -6,29 +6,33 @@
 Ext4.define('LABKEY.SignalData.QualityControl', {
     extend: 'Ext.panel.Panel',
 
-    layout: 'card',
+    layout: {
+        type: 'card',
+        align: 'stretch',
+        pack: 'start',
+    },
 
     minWidth: 650,
 
-    height: 700,
+    height: 1500,
 
-    initComponent : function() {
+    initComponent: function () {
 
         this.items = [];
 
         this.callParent();
 
-        this.getRunContext(function(context) {
+        this.getRunContext(function (context) {
             this.loadContext(context);
         }, this);
     },
 
-    loadContext : function(context) {
+    loadContext: function (context) {
         this.context = context;
         this.add(this.getSampleCreator());
     },
 
-    getSampleCreator : function() {
+    getSampleCreator: function () {
         if (!this.sampleCreator) {
             this.sampleCreator = Ext4.create('LABKEY.SignalData.SampleCreator', {
                 context: this.context,
@@ -38,51 +42,49 @@ Ext4.define('LABKEY.SignalData.QualityControl', {
         return this.sampleCreator;
     },
 
-    getRunContext : function(callback, scope) {
+    getRunContext: function (callback, scope) {
         LABKEY.DataRegion.getSelected({
             selectionKey: LABKEY.ActionURL.getParameter('selectionKey'),
-            success: function(resultSelection) {
+            success: function (resultSelection) {
                 LABKEY.Query.selectRows({
                     schemaName: LABKEY.ActionURL.getParameter('schemaName'),
-                    queryName: 'Data',
+                    queryName: 'Runs',
                     requiredVersion: 13.2,
-                    filterArray: [ LABKEY.Filter.create('RowId', resultSelection.selected.join(';'), LABKEY.Filter.Types.IN) ],
-                    success: function(result) {
-                        var runNames = [];
-                        var dataNames = [];
-                        if (result.rows.length > 0) {
+                    filterArray: [
+                        LABKEY.Filter.create('RowId', resultSelection.selected.join(';'), LABKEY.Filter.Types.IN)
+                    ],
+                    success: function (runs) {
+                        if (runs.rows.length > 0) {
+                            var runIds = [];
+                            var runNames = [];
 
-                            Ext4.each(result.rows, function(row) {
-                                runNames.push(row['Run/RunIdentifier'].value);
-                                dataNames.push(row['Name'].value);
+                            Ext.each(runs.rows, function (row) {
+                                runIds.push(row['RowId'].value);
+                                runNames.push(row['RunIdentifier'].value);
                             });
+
 
                             LABKEY.Query.selectRows({
                                 schemaName: LABKEY.ActionURL.getParameter('schemaName'),
-                                queryName: 'Runs',
+                                queryName: 'Data',
                                 requiredVersion: 13.2,
-                                columns: 'RowId',
                                 filterArray: [
-                                    LABKEY.Filter.create('RunIdentifier', runNames.join(';'), LABKEY.Filter.Types.IN)
+                                    LABKEY.Filter.create('Run/RunIdentifier', runNames.join(';'), LABKEY.Filter.Types.IN)
                                 ],
-                                success: function(runs) {
+                                success: function (data) {
+                                    var dataNames = [];
 
-                                    var runIds = [];
-
-                                    Ext.each(runs.rows, function(row) {
-                                        runIds.push(row['RowId'].value);
+                                    Ext.each(data.rows, function(row) {
+                                        dataNames.push(row['Name'].value);
                                     });
 
                                     SignalDataService.getRun(LABKEY.ActionURL.getParameter('schemaName'), runIds, dataNames, callback, scope);
-                                },
-                                scope: this
+                                }
                             });
                         }
-                    },
-                    scope: this
+                    }
                 });
-            },
-            scope: this
+            }
         });
     }
 });

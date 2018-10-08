@@ -14,7 +14,7 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
         regionWeights: {
             west: 20,
             north: 10,
-            south: -10,
+            south: 20,
             east: 20
         }
     },
@@ -27,7 +27,8 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
             this.getWest(),
             this.getNorth(),
             this.getCenter(),
-            this.getEast()
+            this.getEast(),
+            this.getSouth()
         ];
 
         this.callParent();
@@ -53,7 +54,7 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                 title: 'Available Inputs',
                 header: false,
                 id: 'sampleinputs',
-                width: 250,
+                width: 300,
                 border: false, frame: false,
                 style: 'border-right: 1px solid lightgrey; overflow-x: hidden; overflow-y: auto;',
                 bodyStyle: 'overflow-y: auto;',
@@ -63,10 +64,14 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                     store: {
                         xtype: 'store',
                         model: 'LABKEY.SignalData.ProvisionalRun',
-                        data: this.context.rawInputs
+                        data: this.context.rawInputs,
+                        sorters: [{
+                            property: "name",
+                            direction: "ASC"
+                        }]
                     },
                     columns: [
-                        {text: 'Inputs', dataIndex: 'name', width: 205}
+                        {text: 'Inputs', dataIndex: 'name', width: 300}
                     ],
                     selModel: {
                         selType: 'checkboxmodel',
@@ -285,7 +290,7 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                     allContent = [],
                     contentMap = {};
 
-                var done = function(content) {
+                var contentDone = function(content) {
                     received++;
                     allContent.push(content);
                     contentMap[content.fileName] = content;
@@ -293,13 +298,18 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                         this.allContent = allContent;
                         this.contentMap = contentMap;
                         this.renderPlot(allContent, true);
+                        this.fireEvent('rendertable', this.allContent);
                     }
                 };
 
                 for (var d=0; d < provisionalRuns.length; d++) {
-                    var pr = provisionalRuns[d].get('expDataRun');
-                    if (pr) {
-                        SignalDataService.FileContentCache(pr, done, this);
+                    if (provisionalRuns[d].get('expDataRun')) {
+
+                        SignalDataService.FileContentCache(
+                            provisionalRuns[d],
+                            provisionalRuns[d].get('name'),
+                            contentDone,
+                            this);
                     }
                     else {
                         console.error('Failed to load expDataRun from provisional run.');
@@ -341,43 +351,44 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                     xtype: 'store',
                     model: 'LABKEY.SignalData.Sample'
                 },
+                //height: 800,
                 itemSelector: 'tr.item',
                 autoScroll: true,
                 tpl: new Ext4.XTemplate(
                     '<table style="width: 100%;">',
-                        '<tr>',
-                            '<th style="text-align: left;">Name</th>',
-                            '<th style="text-align: left;">Left</th>',
-                            '<th style="text-align: left;">Right</th>',
-                            '<th style="text-align: left;">Base</th>',
-                            '<th style="text-align: left;">Include</th>',
-                            '<th style="text-align: left;">Response</th>',
-                            '<th></th>',
-                        '</tr>',
-                        '<tpl for=".">',
-                            '<tr class="item" modelname="{name}">',
-                                '<td>{name}</td>',
-                                '<td><input value="{xleft}" placeholder="xleft" name="xleft" style="width: 40px;"/></td>',
-                                '<td><input value="{xright}" placeholder="xright" name="xright" style="width: 40px;"/></td>',
-                                '<td><input value="{base}" name="base" style="width: 40px;"/></td>',
-                                '<td><input value="{include}" name="include" type="checkbox" {include:this.renderChecked}/></td>',
-                                '<td><span name="response">{peakResponse:this.renderPeakResponse}</span></td>',
-                                '<td><button title="copy">C</button></td>',
-                            '</tr>',
-                        '</tpl>',
+                    '<tr>',
+                    '<th style="text-align: left;">Name</th>',
+                    '<th style="text-align: left;">Left</th>',
+                    '<th style="text-align: left;">Right</th>',
+                    '<th style="text-align: left;">Base</th>',
+                    '<th style="text-align: left;">Include</th>',
+                    '<th style="text-align: left;">Response</th>',
+                    '<th></th>',
+                    '</tr>',
+                    '<tpl for=".">',
+                    '<tr class="item" modelname="{name}">',
+                    '<td>{name}</td>',
+                    '<td><input value="{xleft}" placeholder="xleft" name="xleft" style="width: 40px;"/></td>',
+                    '<td><input value="{xright}" placeholder="xright" name="xright" style="width: 40px;"/></td>',
+                    '<td><input value="{base}" name="base" style="width: 40px;"/></td>',
+                    '<td><input value="{include}" name="include" type="checkbox" {include:this.renderChecked}/></td>',
+                    '<td><span name="response">{peakResponse:this.renderPeakResponse}</span></td>',
+                    '<td><button title="copy">C</button></td>',
+                    '</tr>',
+                    '</tpl>',
                     '</table>',
-                        {
-                            renderChecked : function(checked) {
-                                var ret = '';
-                                if (checked === true) {
-                                    ret = ' checked="checked" ';
-                                }
-                                return ret;
-                            },
-                            renderPeakResponse : function(response) {
-                                return response.toFixed(3);
+                    {
+                        renderChecked : function(checked) {
+                            var ret = '';
+                            if (checked === true) {
+                                ret = ' checked="checked" ';
                             }
+                            return ret;
+                        },
+                        renderPeakResponse : function(response) {
+                            return response.toFixed(3);
                         }
+                    }
                 ),
                 listeners: {
                     viewready: function(v) { this.qcresultview = v; },
@@ -401,10 +412,6 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                     xtype: 'toolbar',
                     dock: 'top',
                     items: [{
-                       // text: 'Calculate',
-                       // handler: this.runAnalysis,
-                       // scope: this
-                    // },{
                         text: 'Clear Highlight',
                         handler: function() {
                             this.highlighted = undefined;
@@ -415,13 +422,21 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                 }]
             });
 
-            this.on('startqc', function(runs) {
+            var compare = function(a,b) {
+                if (a.name < b.name)
+                    return -1;
+                if (a.name > b.name)
+                    return 1;
+                return 0;
+            }
 
+            this.on('startqc', function(runs) {
                 var _runs = [];
                 for (var r=0; r < runs.length; r++) {
                     _runs.push(Ext4.clone(runs[r].data));
                 }
-                view.getStore().loadData(_runs);
+                var sortedRuns = _runs.sort(compare);
+                view.getStore().loadData(sortedRuns);
 
             }, this);
             this.on('curvechange', function(xleft, xright) { this.renderPlot(this.allContent); }, this);
@@ -430,6 +445,91 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
 
         return this.eastpanel;
     },
+
+    getSouth : function() {
+
+        if (!this.southpanel) {
+
+            this.southpanel = Ext4.create('Ext.panel.Panel', {
+                title: 'Peak Data',
+                region: 'south',
+                autoScroll: true,
+                width: 400,
+                height: 400,
+                layout: {
+                    type: 'vbox',
+                    align: 'stretch'
+                },
+            });
+
+            var compare = function(a,b) {
+                if (a.fileName < b.fileName)
+                    return -1;
+                if (a.fileName > b.fileName)
+                    return 1;
+                return 0;
+            }
+
+            this.on('rendertable', function(allContent) {
+                var sortedContent = allContent.sort(compare);
+                var _peaks = [];
+                var _header = {'name': 'Name', 'id': 'id', 'x': this.getXLabel(), 'y': this.getYLabel()};
+
+                for (var r=0; r < sortedContent.length; r++) {
+                    for (var j=0; j < sortedContent[r].peakinfo.length; j++) {
+                        var peakinfo = sortedContent[r].peakinfo[j];
+                        peakinfo.name = sortedContent[r].fileName;
+                        peakinfo.id = peakinfo.name+peakinfo.x+','+peakinfo.y;
+                        _peaks.push(peakinfo);
+                        for(var k = 0;k < Object.keys(peakinfo).length; k++) {
+                            var key = Object.keys(peakinfo)[k];
+                            if (_header[key] == null) {
+                                _header[key] = key;
+                            }
+                        }
+                    }
+                }
+                delete _header['index'];
+
+                Ext4.ModelManager.unregisterType('LABKEY.SignalData.Peak');
+                Ext4.define('LABKEY.SignalData.Peak', {
+                    extend: 'Ext.data.Model',
+                    fields: Object.keys(_header).map(function (val) { return {name: val}; })
+                });
+
+                var store = Ext4.create('Ext.data.Store', {
+                    model: 'LABKEY.SignalData.Peak',
+                    data: _peaks
+                });
+
+                var columns = Object.keys(_header).map(function (val) {
+                    if (val == 'id') {
+                        return {text: val, dataIndex: val, hidden: true};
+                    }
+                    else {
+                        return {text: _header[val], dataIndex: val, flex: 1};
+                    }
+                });
+
+                var view = // create the grid
+                    Ext4.create('Ext.grid.Panel', {
+                        id: 'peaktable',
+                        store: store,
+                        columns: columns,
+                        disableSelection: true
+                    });
+
+                this.southpanel.removeAll();
+                this.southpanel.add(view);
+
+                view.getStore().loadData(_peaks);
+
+            }, this);
+        }
+
+        return this.southpanel;
+    },
+
 
     /**
      * Fires whenever a user selects any input for a give QC Result row. Primarily used to check if they clicked
@@ -449,7 +549,7 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
         var modelname = sample.get('name');
 
         if (modelname) {
-            this.highlighted = sample.get('name') + '.'  + sample.get('fileExt');
+            this.highlighted = modelname;
             this.renderPlot(this.allContent);
         }
     },
@@ -481,7 +581,7 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
                 include = this._getNode(view, model, 'input[name="include"]');
                 response = this._getNode(view, model, 'span[name="response"]');
 
-                var fileContent = this.contentMap[model.get('name') + '.' + model.get('fileExt')];
+                var fileContent = this.contentMap[model.get('name')];
                 var data = SignalDataService.getData(fileContent, xleft, xright, false);
                 var aucPeak = LABKEY.SignalData.Stats.getAUC(data, base);
                 response.update(+aucPeak.auc.toFixed(3));

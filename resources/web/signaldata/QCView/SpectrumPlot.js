@@ -9,7 +9,7 @@ Ext4.define('LABKEY.SignalData.SpectrumPlot', {
 
     alias: 'widget.spectrum',
 
-    colors: ['#00FE00', '#0100FE', '#FC01FC', '#ff0000'],
+    colors: ['#00FE00', '#0100FE', '#FC01FC', '#FF0000', "#FF7F0E", "00EFEF", "CBCB00"],
 
     yLabel: '',
 
@@ -50,13 +50,17 @@ Ext4.define('LABKEY.SignalData.SpectrumPlot', {
             contents = this._lastContent;
         }
 
-        var layers = [];
+        // var layers = [];
         var colors = this.colors;
 
         var xleft = this.leftRight[0], xright = this.leftRight[1],
-                low = this.lowHigh[0], high = this.lowHigh[1];
+              low = this.lowHigh[0],     high = this.lowHigh[1];
 
         var c=0, isHighlight = false, useHighlight = (this.highlight ? true : false), color;
+
+        var data = [];
+        var annotations = [];
+
         for (var i=0; i < contents.length; i++) {
             //
             // create point layer
@@ -67,23 +71,58 @@ Ext4.define('LABKEY.SignalData.SpectrumPlot', {
                 isHighlight = (this.highlight === contents[i].fileName);
 
                 if (!isHighlight) {
-                    color = '#A09C9C';
+                    color = 'rgba(160, 156, 156, 0.3)'//'#A09C9C';
                 }
             }
-
-            var pointLayer = new LABKEY.vis.Layer({
-                data: SignalDataService.getData(contents[i], xleft, xright, 2),
-                aes: {
-                    x: function(r) { return r[0]; },
-                    y: function(r) { return r[1]; }
-                },
-                geom: new LABKEY.vis.Geom.Path({
-                    color: color
-                })
-            });
             c++;
 
-            layers.push(pointLayer);
+            d = SignalDataService.getData(contents[i], 0, 0);
+
+            var line = {x: d.map(val => val[0]),
+                        y: d.map(val => val[1]),
+                        mode: 'lines',
+                        type: 'scatter',
+                        name: contents[i].fileName,
+                        line: {color: color},
+             };
+            data.push(line);
+
+            // obtain peak annotations
+            if(contents[i].peakinfo != null) {
+                for (var j = 0; j < contents[i].peakinfo.length; j++) {
+                    var x = contents[i].peakinfo[j].x;
+                    var y = contents[i].peakinfo[j].y;
+                    var annotation = {
+                        name: contents[i].fileName + x + ',' + y,
+                        x: parseFloat(x),
+                        y: parseFloat(y),
+                        xref: 'x',
+                        yref: 'y',
+                        text: '<a href="#' +
+                            'peaktable" target="_self" style="color:white">' +
+                            // contents[i].fileName  + x + ',' + y +
+                            // '" target="_self" style="color:white">' +
+                            x + ' ' + y +
+                            '</a>',
+                        showarrow: true,
+                        arrowhead: 2,
+                        arrowsize: 1,
+                        arrowwidth: 2,
+                        ax: 40,
+                        ay: -40,
+                        borderwidth: 2,
+                        borderpad: 4,
+                        bgcolor: color,
+                        opacity: 0.8,
+                        font: {
+                            color: "#ffffff",
+                            size: 12
+                        },
+                        captureevents: true,
+                    };
+                    annotations.push(annotation);
+                }
+            }
         }
 
         this.update('');
@@ -93,38 +132,49 @@ Ext4.define('LABKEY.SignalData.SpectrumPlot', {
         var width = box.width;
         var height = box.height - 30;
 
-        var me = this;
-
-        var plot = new LABKEY.vis.Plot({
-            renderTo: this.id,
-            rendererType: 'd3',
+        var layout = {
+            showlegend: true,
+            xaxis: {range: [xleft, xright]},
+            yaxis: {range: [low, high]},
+            annotations:
+                annotations,
             width: width,
             height: height,
-            layers: layers,
-            legendPos: 'none',
-            labels: {
-                x: {value: this.xLabel},
-                y: {value: this.yLabel}
-            },
-            scales: {
-                x: { domain: [xleft, xright] },
-                y: { domain: [low, high] }
-            },
-            brushing: {
-                brush: function() {}, /* required due to bug in brushing API */
-                brushend: function(e, d, extent, ls) {
-                    var left = extent[0][0];
-                    var right = extent[1][0];
-                    var bottom = extent[0][1];
-                    var top = extent[1][1];
-                    me.updateZoom(left, right, bottom, top);
-                }
-            }
-        });
+            editable: true,
+            responsive: true
+        };
 
         this._lastContent = contents;
-        plot.render();
+
+        var clearRowHighlight = function(currentValue) {
+            currentValue.childNodes.forEach(function (c)
+            {
+                c.setAttribute('style', '');
+                c.setAttribute('tabindex', '');
+            });
+        };
+        var setRowHighlight = function(currentValue) {
+            currentValue.childNodes.forEach(function(c)
+            {
+                c.setAttribute('style', 'background-color:#FFFF00');
+                c.setAttribute('tabindex', '-1');
+            });
+        }
+        // render plot with disabled legend clicking and highlight clicked annotations in data table
+        Plotly.newPlot(this.id, data, layout).then(gd => {
+            // clear previous highlight if clicking elsewhere on the plot
+            gd.on('plotly_click', (event, data) => {
+                Ext4.getCmp('peaktable').el.dom.getElementsByTagName('tbody')[0].childNodes.forEach(clearRowHighlight);
+            });
+            //apply highlight
+            gd.on('plotly_clickannotation', (event, data) => {
+                Ext4.getCmp('peaktable').el.dom.getElementsByTagName('tbody')[0].childNodes.forEach(clearRowHighlight);
+                setRowHighlight(document.querySelector('tr[id$="'+ event.annotation.name + '"]'));
+            });
+            gd.on('plotly_legendclick', () => false);
+        });
     },
+
 
     setHighlight : function(highlight) {
         this.highlight = highlight;

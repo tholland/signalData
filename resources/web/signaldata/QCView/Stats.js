@@ -138,5 +138,5 @@ Ext4.define('LABKEY.SignalData.Stats', {
         var x_minus = (negB - sqrtInner) / bottom;
 
         return [x_plus, x_minus];
-    }
+    },
 });

@@ -6,9 +6,17 @@
         <exp:RangeURI>http://www.w3.org/2001/XMLSchema#string</exp:RangeURI>
     </exp:PropertyDescriptor>
     <exp:PropertyDescriptor>
-        <exp:Name>DataFile</exp:Name>
-        <exp:Required>true</exp:Required>
-        <exp:RangeURI>http://cpas.fhcrc.org/exp/xml#fileLink</exp:RangeURI>
-        <exp:Label>Data File</exp:Label>
+        <exp:Name>index</exp:Name>
+        <exp:RangeURI>http://www.w3.org/2001/XMLSchema#int</exp:RangeURI>
+    </exp:PropertyDescriptor>
+    <exp:PropertyDescriptor>
+        <exp:Name>X</exp:Name>
+        <exp:RangeURI>http://www.w3.org/2001/XMLSchema#double</exp:RangeURI>
+        <exp:Label>X position</exp:Label>
+    </exp:PropertyDescriptor>
+    <exp:PropertyDescriptor>
+        <exp:Name>Y</exp:Name>
+        <exp:RangeURI>http://www.w3.org/2001/XMLSchema#double</exp:RangeURI>
+        <exp:Label>Y position</exp:Label>
     </exp:PropertyDescriptor>
 </ap:domain>

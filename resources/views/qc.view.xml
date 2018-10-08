@@ -10,5 +10,8 @@
         <dependency path="signaldata/QCView/ProvisionalRun.js"/>
         <dependency path="signaldata/QCView/SampleCreator.js"/>
         <dependency path="signaldata/QCView/QualityControl.js"/>
+        <dependency path="https://cdn.plot.ly/plotly-1.39.4.min.js"/>
+        <dependency path="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.js"/>
+        <dependency path="File"/>
     </dependencies>
 </view>

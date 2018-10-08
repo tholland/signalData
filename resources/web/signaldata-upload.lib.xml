@@ -2,7 +2,7 @@
     <library compileInProductionMode="false">
         <script path="signaldata/signaldata.css"/>
         <script path="signaldata/UploadView/UploadLog.js"/>
-        <script path="signaldata/UploadView/uploadResultFiles.js"/>
+        <!--<script path="signaldata/UploadView/uploadResultFiles.js"/>-->
         <script path="signaldata/UploadView/uploadResultDataForm.js"/>
     </library>
     <dependencies>

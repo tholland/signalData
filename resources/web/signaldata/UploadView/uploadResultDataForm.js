@@ -8,10 +8,12 @@
  */
 Ext4.ns('LABKEY.SignalData');
 
-LABKEY.SignalData.initializeUploadForm = function(metadataFormElId, metadataFileId, metadataTSVId, nextButtonElId, renderToId, templateDivId) {
+LABKEY.SignalData.initializeUploadForm = function(metadataFormElId, metadataJsonId, nextButtonElId, renderToId) {
 
     var assayType = 'Signal Data';
     var assay;
+    var run;
+    var runFolder;
 
     var loadAssay = function(cb, scope) {
         if (LABKEY.page && LABKEY.page.assay) {
@@ -43,56 +45,157 @@ LABKEY.SignalData.initializeUploadForm = function(metadataFormElId, metadataFile
         }
     };
 
-    var formSubmitted = function (data) {
-        var run = new LABKEY.Exp.Run();
-        run.name = data.name;
+    var getRunFolderName = function() {
+        if(runFolder == null) {
+            var now = new Date();
+            var parts = [now.getFullYear(), now.getMonth() + 1, //javascript uses 0 based month
+                now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()];
+            runFolder = parts.join('_');
+        }
+        return runFolder;
+    };
+
+    var saveRun = function(run) {
+
+        LABKEY.Experiment.saveBatch({
+            assayId: assay.id,
+            batch: {
+                batchProtocolId: assay.id,
+                runs: [{
+                    name: run.name,
+                    properties: run.properties,
+                    dataRows: run.dataRows,
+                    dataInputs: run.dataInputs
+                }]
+            },
+            success: function() {
+                window.location = LABKEY.ActionURL.buildURL('assay', 'assayBegin', null, {rowId: assay.id}) || this;
+            },
+            failure: function(response){
+                Ext4.Msg.alert("Saving run failed!");
+            }
+        }, this);
+    }
+
+    //Check if folder exists and if not then create it
+    var checkOrCreateFolder = function (targetFolder, fileSystem, scope, callback, data, context) {
+        var targetURL = fileSystem.concatPaths(fileSystem.getAbsoluteBaseURL(), targetFolder);
+        LABKEY.Ajax.request({
+            url: targetURL,
+            method: 'GET',
+            params: {method: 'JSON'},
+            success: function (response) {
+                callback.call(scope, data, context);
+            },
+            failure: function (b, xhr) {
+                //Working directory not found, create it.
+                fileSystem.createDirectory({
+                    path: targetURL,
+                    success: function () {
+                        callback.call(scope, data, context);
+                    },
+                    failure: function () {
+                        Ext4.Msg.alert("Error", "Couldn't generate working directory");
+                    },
+                    scope: scope
+                }, scope);
+            },
+            scope: this
+        }, this);
+
+    };
+
+    var processJson = function(data, context) {
+        var contentStr = "";
+        for(var i=0;i<data.content.sheets[0].data.length;i++){
+            contentStr += data.content.sheets[0].data[i][0].value+"\n";
+        }
+
+        var jsonObj = Ext.util.JSON.decode(contentStr);
+
+        var fileSystem = Ext4.create('File.system.Webdav', {});
+
+        fileSystem.movePath({
+            source: decodeURI(LABKEY.ActionURL.getContainer() + '/@files/assaydata/' + data.dataFileURL.replace(/.*\//, '')),
+            destination: LABKEY.ActionURL.getContainer() + '/@files/SignalDataAssayData/' + getRunFolderName() + '/' + data.name,
+            isFile: true
+        });
+
+        run = new LABKEY.Exp.Run();
+        run.name = getRunFolderName();
+
+        for (var i=0;i<assay.domains[assay.name + ' Run Fields'].length;i++) {
+            var index = assay.domains[assay.name + ' Run Fields'][i].name;
+            run.properties[index] = jsonObj[index];
+        }
         run.dataInputs = [ data ];
 
+        var newPipelinePath = 'SignalDataAssayData/' + getRunFolderName() + '/' + data.name;
+        data.dataFileURL = encodeURI(data.dataFileURL.replace(encodeURI(data.pipelinePath), newPipelinePath));
+        data.pipelinePath = newPipelinePath;
+        data.properties['Datafile'] = data.dataFileURL;
+
+        if (jsonObj.peakinfo != null) {
+            for (var i = 0; i < jsonObj.peakinfo.length; i++) {
+                var row = {};
+                row['Name'] = jsonObj.series[jsonObj.peakinfo[i]['index']].name;
+                for (var key in jsonObj.peakinfo[i]) {
+                    row[key] = jsonObj.peakinfo[i][key];
+                }
+                run.dataRows.push(row);
+            }
+        }
+        run.properties['DataFile'] = decodeURI(data.dataFileURL).replace('file:','');
+
+        saveRun(run);
+    };
+
+    var jsonSubmitted = function (data, context) {
         if (!data.content)
         {
-            data.getContent({
-                format: 'jsonTSVExtended',
-                success: function (content) {
-                    data.content = content;
-                    LABKEY.SignalData.initializeDataFileUploadForm(metadataFormElId, renderToId, assay, run, content);
-                    document.getElementById(metadataFormElId).style.display = 'none';
+            LABKEY.Ajax.request({
+                url: LABKEY.ActionURL.buildURL('SignalData', 'getSignalDataPipelineContainer.api'),
+                method: 'GET',
+                success: function (response) {
+                    var context = Ext4.decode(response.responseText);
+                    if (Ext4.isObject(context) && !Ext4.isEmpty(context.containerPath) && !Ext4.isEmpty(context.webDavURL)) {
+                        data.getContent({
+                            format: 'jsonTSVExtended',
+                            success: function (content) {
+                                data.content = content;
+
+                                this.fileSystem = Ext4.create('File.system.Webdav', {
+                                    rootPath: context['webDavURL'],
+                                    rootName: 'fileset'
+                                });
+
+                                var folderName = getRunFolderName();
+                                checkOrCreateFolder(folderName, this.fileSystem, this, processJson, data, context );
+                            },
+                            failure: function (error, format) {
+                                Ext4.Msg.alert("File processing failed!");
+                            }
+                        });
+                    }
+                    else {
+                        Ext4.Msg.alert('Error', 'Failed to load the pipeline context for Signal Data');
+                    }
                 },
-                failure: function (error, format) {
+                failure: function (error, response) {
+                    Ext4.Msg.alert('Error', 'Failed to load the pipeline context for Signal Data');
                 }
             });
         }
     };
 
     var formFailed = function (form, action) {
-        alert('Upload failed!');
+        Ext4.Msg.alert('Upload failed!');
     };
 
-    LABKEY.SignalData.disableFileUpload = function() {
-        tsvForm.setVisible(true);
-        fileForm.setVisible(false);
-
-        activeForm = tsvForm;
-    };
-
-    LABKEY.SignalData.enableFileUpload = function() {
-        tsvForm.setVisible(false);
-        fileForm.setVisible(true);
-
-        activeForm = fileForm;
-    };
-
-
-    var activeForm;
-    var fileForm;
-    var tsvForm;
+    var jsonForm;
     loadAssay(function() {
-        //Load the rowId into the template link
-        var templateLink = document.getElementById(templateDivId);
-        templateLink.setAttribute('href', LABKEY.ActionURL.buildURL("assay", "template", LABKEY.ActionURL.getContainer(),
-                {rowId: assay.id}));
-
-        fileForm = Ext4.create('Ext.form.Panel',{
-            renderTo: metadataFileId,
+        jsonForm = Ext4.create('Ext.form.Panel',{
+            renderTo: metadataJsonId,
             border: false,
             bodyStyle: 'background-color: transparent;',
             fileUpload: true,
@@ -100,67 +203,35 @@ LABKEY.SignalData.initializeUploadForm = function(metadataFormElId, metadataFile
             flex:1,
             items: [{
                 xtype: 'filefield',
-                id: 'file',
+                id: 'json',
                 width: 400,
                 buttonConfig: {
-                    text: 'Upload txt, tsv, xls, xlsx'
+                    text: 'Select input file'
                 }
-            }, {
-                xtype: 'hidden',
-                name: 'X-LABKEY-CSRF',
-                value: LABKEY.CSRF
-            }],
+            },
+                {
+                    xtype: 'hidden',
+                    name: 'X-LABKEY-CSRF',
+                    value: LABKEY.CSRF
+                }],
+            method: "POST",
             listeners: {
                 actioncomplete : function (form, action) {
+                    action.result.dataFileURL;
                     var data = new LABKEY.Exp.Data(action.result);
-                    formSubmitted(data);
+                    jsonSubmitted(data);
                 },
                 actionfailed: formFailed
-            }
-        });
-
-        tsvForm = Ext4.create('Ext.form.Panel',{
-            renderTo: metadataTSVId,
-            border: false,
-            bodyStyle: 'background-color: transparent;',
-            getTsvInput: function(){
-                return Ext4.getCmp('tsv').value;
             },
-            items: [{
-                xtype: 'textarea',
-                id: 'tsv',
-                height: 300,
-                minHeight: 300,
-                width: 400,
-                minWidth:150
-            }, {
-                xtype: 'hidden',
-                name: 'X-LABKEY-CSRF',
-                value: LABKEY.CSRF
-            }],
-            submit:function(){
-                LABKEY.Ajax.request({
-                    url: LABKEY.ActionURL.buildURL("assay", "assayFileUpload", LABKEY.ActionURL.getContainer()),
-                    params: { protocolId: assay.id, fileName: metadataTSVId + '.txt', fileContent: this.getTsvInput() },
-                    success: function(response) {
-                        var data = new LABKEY.Exp.Data(Ext.util.JSON.decode(response.responseText));
-                        formSubmitted(data);
-                    },
-                    failure: formFailed
-                });
-            },
-            scope: this
         });
 
         Ext4.create('Ext.button.Button', {
             xtype: 'button',
             renderTo: nextButtonElId,
-            text: 'next',
+            text: 'submit',
             handler: function () {
-                activeForm.submit();
+                jsonForm.submit();
             }
         });
-
-        LABKEY.SignalData.enableFileUpload();
     });
 };

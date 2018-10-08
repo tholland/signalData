@@ -7,18 +7,8 @@ Ext4.define('LABKEY.SignalData.ProvisionalRun', {
     extend: 'Ext.data.Model',
     fields: [
         {name: 'name'},
-        {name: 'fileExt'},
-        {name: 'filePath'},
-        {name: 'expDataRun'}
-    ]
-});
-
-Ext4.define('LABKEY.SignalData.Standard', {
-    extend: 'Ext.data.Model',
-    fields: [
-        {name: 'Key', type: 'int'},
-        {name: 'Name'},
-        {name: 'provisionalRun'}
+        {name: 'expDataRun'},
+        {name: 'index'}
     ]
 });
 
@@ -27,6 +17,7 @@ Ext4.define('LABKEY.SignalData.StandardSource', {
     fields: [
         {name: 'key', type: 'int'},
         {name: 'expDataRun'},
+        {name: 'index'},
         {name: 'standard', type: 'int'}, // lookup to Standard.key
         {name: 'name'},
         {name: 'concentration', type: 'float'},
@@ -38,7 +29,8 @@ Ext4.define('LABKEY.SignalData.StandardSource', {
         {name: 'peakResponse', type: 'float'},
         {name: 'filePath'},
         {name: 'fileName'},
-        {name: 'fileExt'}
+        {name: 'fileExt'},
+        {name: 'id'}
     ]
 });
 

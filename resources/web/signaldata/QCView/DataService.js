@@ -16,37 +16,99 @@ Ext4.define('LABKEY.SignalData.DataService', {
     _PipelineCache: undefined,
     _AssayTypeCache: {},
 
-    FileContentCache : function(expData /* LABKEY.Exp.Data */, callback, scope) {
-        if (expData instanceof LABKEY.Exp.Data)
-        {
-            var path = expData['pipelinePath'];
+    FileContentCache : function(provisionalRun, name, callback, scope) {
+        var expData = provisionalRun.get('expDataRun');
 
-            var content = this._ContentCache[path];
-            if (content)
-            {
-                if (Ext4.isFunction(callback))
-                    callback.call(scope || this, content);
-            }
-            else
-            {
-                expData.getContent({
-                    format: 'jsonTSV',
-                    success: function (c)
-                    {
-                        this._ContentCache[path] = c;
-                        if (Ext4.isFunction(callback))
-                            callback.call(scope || this, c);
-                    },
-                    failure: function (error)
-                    {
-                        alert('Failed to Load File Contents');
-                    },
-                    scope: this
-                });
+        var index = provisionalRun.get('index');
+        var path = expData['pipelinePath']+index;
+
+        var content = this._ContentCache[path];
+
+        if (content)  {
+            if (Ext4.isFunction(callback)) {
+                callback.call(scope || this, content);
             }
         }
         else {
-            console.error('LABKEY.SignalData.QualityControl.FileContentCache: invalid expData object. Must be of type LABKEY.Exp.Data');
+            this._ContentCache = {};
+            var webdav = Ext4.create('File.system.Webdav', {});
+            var url = webdav.prefixUrl +
+                LABKEY.ActionURL.getContainer() +
+                '/@files/' +
+                expData['pipelinePath'];
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+
+            // If specified, responseType must be empty string or "text"
+            xhr.responseType = 'text';
+
+            xhr.onload = function () {
+                try {
+                    if (xhr.readyState === xhr.DONE && xhr.status === 200) {
+                        var content = JSON.parse(xhr.responseText);
+                        content.fileName = name;
+                        content.series = content.series.slice(index, index + 1);
+                        var selectedPeaks = [];
+                        for (var i = 0; i < content.peakinfo.length; i++) {
+                            if (content.peakinfo[i].index == index) {
+                                selectedPeaks.push(content.peakinfo[i]);
+                            }
+                        }
+                        content.peakinfo = selectedPeaks;
+                        SignalDataService._ContentCache[path] = content;
+
+                        if (Ext4.isFunction(callback))
+                            callback.call(scope || this, content);
+                    }
+                    else {
+                        throw "";
+                    }
+                // json loading failed so try to load as a zip
+                } catch (e) {
+                    try {
+                        var oReq = new XMLHttpRequest();
+                        oReq.open("GET", url, true);
+                        oReq.responseType = "blob";
+
+                        oReq.onload = function (oEvent) {
+                            var blob = oReq.response;
+
+                            var new_zip = new JSZip();
+                            new_zip.loadAsync(blob).then(function () {
+                                // read in the first file in the zip file
+                                Object.values(new_zip.files)[0].async("string").then(
+                                    function (c) {
+                                        var content = JSON.parse(c);
+                                        content.fileName = name;
+                                        content.series = content.series.slice(index, index + 1);
+                                        var selectedPeaks = [];
+                                        for (var i = 0; i < content.peakinfo.length; i++) {
+                                            if (content.peakinfo[i].index == index) {
+                                                selectedPeaks.push(content.peakinfo[i]);
+                                            }
+                                        }
+                                        content.peakinfo = selectedPeaks;
+                                        SignalDataService._ContentCache[path] = content;
+
+                                        if (Ext4.isFunction(callback))
+                                            callback.call(scope || this, content);
+                                    }
+                                );
+                            });
+                            if (Ext4.isFunction(callback))
+                                callback.call(scope || this, content);
+                        };
+                        oReq.send(null);
+                    } catch (e) {
+                        alert('Failed to Load File Contents');
+                        if (Ext4.isFunction(callback))
+                            callback.call(scope || this, content);
+                    }
+                }
+            };
+
+            xhr.send(null);
         }
     },
 
@@ -56,12 +118,13 @@ Ext4.define('LABKEY.SignalData.DataService', {
      * @param xleft
      * @param xright
      * @param mod - if not specified it will not be used
+     * @param index - series index to use
      * @returns {Array}
      */
     getData : function(datacontent, xleft, xright, mod) {
         var data = [];
         if (datacontent) {
-            var _data = datacontent.sheets[0].data;
+            var _data = datacontent.series[0].data;
             _data.shift(); // get rid of column headers
             var newData = [], d, xy;
 
@@ -75,7 +138,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                 //
                 if (xleft == 0 && xright == 0) {
                     for (d=0; d < _data.length; d++) {
-                        xy = _data[d][0].split(' ');
+                        xy = _data[d];
                         xy[0] = parseFloat(xy[0]);
                         xy[1] = parseFloat(xy[1]);
                         newData.push(xy);
@@ -86,7 +149,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                     // using bounds
                     //
                     for (d=0; d < _data.length; d++) {
-                        xy = _data[d][0].split(' ');
+                        xy = _data[d];
                         xy[0] = parseFloat(xy[0]);
                         xy[1] = parseFloat(xy[1]);
                         if (xy[0] > xleft && xy[0] < xright)
@@ -101,7 +164,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                 if (xleft == 0 && xright == 0) {
                     for (d=0; d < _data.length; d++) {
                         if (d%mod == 0) {
-                            xy = _data[d][0].split(' ');
+                            xy = _data[d];
                             xy[0] = parseFloat(xy[0]);
                             xy[1] = parseFloat(xy[1]);
                             newData.push(xy);
@@ -114,7 +177,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                     //
                     for (d=0; d < _data.length; d++) {
                         if (d%mod == 0) {
-                            xy = _data[d][0].split(' ');
+                            xy = _data[d];
                             xy[0] = parseFloat(xy[0]);
                             xy[1] = parseFloat(xy[1]);
                             if (xy[0] > xleft && xy[0] < xright)
@@ -139,18 +202,16 @@ Ext4.define('LABKEY.SignalData.DataService', {
         for (var i = 0; i < datacontents.length; i++)
         {
             var datacontent = datacontents[i];
-            if (datacontent)
+            if (datacontent && datacontent.series)
             {
-                var _data = datacontent.sheets[0].data;
+                var _data = datacontent.series[0].data;
                 _data.shift(); // get rid of column headers
                 var d, xy, y;
 
-                for (d = 0; d < _data.length; d++)
-                {
-                    xy = _data[d][0].split(' ');
+                for (d = 0; d < _data.length; d++) {
+                    xy = _data[d];
                     y = parseFloat(xy[1]);
-                    if (y > maxY)
-                    {
+                    if (y > maxY) {
                         maxY = y;
                     }
                 }
@@ -192,7 +253,10 @@ Ext4.define('LABKEY.SignalData.DataService', {
                         //
                         // Transform select rows result into a structure the Ext store can accept
                         //
+                        var names = {};
+                        var runData = {};
                         var d = [];
+
                         for (var j = 0; j < RunGroups.length; j++) {
                             var RunGroup = RunGroups[j];
                             var runs = RunGroup.runs;
@@ -216,58 +280,130 @@ Ext4.define('LABKEY.SignalData.DataService', {
                                     dataNames[name] = true;
                                 });
 
+
                             for (var k = 0; k < filteredRuns.length; k++)
                             {
                                 var run = filteredRuns[k];
                                 var runIdentifier = run.name;
 
-                                for (var r = 0; r < run.dataRows.length; r++)
-                                {
-                                    //If DataNames is null, all files should be used.
-                                    var isValidData = context.DataNames == null || dataNames[run.dataRows[r]['Name']];
-                                    if (!isValidData) {
-                                        continue;
-                                    }
-
-                                    var name = run.dataRows[r]['Name'].split('.');
-                                    var fileExt = name[1];
-                                    name = name[0];
-                                    var filePath = "";
-                                    var dataFile = run.dataRows[r]['DataFile'];
-
-                                    var osDelimiter = '/';
-                                    var fileName = dataFile.split(osDelimiter).pop();  //Hack to make fileLink and pipe resolve file
-                                    if (fileName == dataFile) { //Filename wasn't parsed correctly
-                                        //Check if windows delimiter
-                                        osDelimiter = '\\';
-                                        fileName = dataFile.split(osDelimiter).pop();
-                                    }
-                                    filePath = context.pipe + osDelimiter + runIdentifier + osDelimiter + fileName;
-
-                                    //
-                                    // Link the associated LABKEY.Exp.Data object (the data file)
-                                    //
-                                    var ExpDataRun = null;
-                                    for (var i = 0; i < run.dataInputs.length; i++) {
-                                        if (run.dataInputs[i].name == fileName) {
-                                            ExpDataRun = run.dataInputs[i];
-                                            break;
-                                        }
-                                    }
-
-                                    d.push({
-                                        name: name,
-                                        fileExt: fileExt,
-                                        filePath: filePath,
-                                        expDataRun: ExpDataRun
-                                    });
+                                //If DataNames is null, all files should be used.
+                                if (context.DataNames == null) {
+                                    continue;
                                 }
+
+                                var name = run.properties['RunIdentifier'];
+                                var filePath = "";
+                                var dataFile = run.properties['DataFile']['dataFileURL'];
+
+                                var osDelimiter = '/';
+                                var fileName = dataFile.split(osDelimiter).pop();  //Hack to make fileLink and pipe resolve file
+                                if (fileName == dataFile) { //Filename wasn't parsed correctly
+                                    //Check if windows delimiter
+                                    osDelimiter = '\\';
+                                    fileName = dataFile.split(osDelimiter).pop();
+                                }
+                                filePath = context.pipe + osDelimiter + runIdentifier + osDelimiter + fileName;
+
+                                names[dataFile] = name;
+                                runData[dataFile] = run.properties['DataFile'];
                             }
                         }
-                        context.rawInputs = d;
 
-                        if (Ext4.isFunction(callback)) {
-                            callback.call(scope || this, context);
+                        var expected = Object.keys(names).length;
+                        var received = 0;
+
+                        var done = function() {
+                            received++;
+                            if (received == expected) {
+                                context.rawInputs = d;
+
+                                if (Ext4.isFunction(callback)) {
+                                    callback.call(scope || this, context);
+                                }
+                            }
+                        };
+
+                        var getDataContent = function(names, runData, i, d, callback) {
+                            var key = Object.keys(names)[i];
+
+                            var data = runData[key];
+
+                            var webdav = Ext4.create('File.system.Webdav', {});
+                            var url = webdav.prefixUrl +
+                                      LABKEY.ActionURL.getContainer() +
+                                      '/@files/' +
+                                      data.pipelinePath;
+
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('GET', url, true);
+
+                            // If specified, responseType must be empty string or "text"
+                            xhr.responseType = 'text';
+
+                            xhr.onload = function () {
+                                try {
+                                    if (xhr.readyState === xhr.DONE && xhr.status === 200) {
+                                        var c = JSON.parse(xhr.responseText);
+                                        if (c.series) {
+                                            for (var i = 0; i < c.series.length; i++) {
+                                                d.push({
+                                                    name: names[key] + ":" + c.series[i].name,
+                                                    expDataRun: data,
+                                                    index: i
+                                                });
+                                            }
+                                        }
+                                        if (Ext4.isFunction(callback))
+                                            callback.call(this, c);
+                                    }
+                                    else {
+                                        throw "";
+                                    }
+                                // json loading failed, try reading it as a zip
+                                } catch (e) {
+                                    try {
+                                        var oReq = new XMLHttpRequest();
+                                        oReq.open("GET", url, true);
+                                        oReq.responseType = "blob";
+
+                                        oReq.onload = function (oEvent) {
+                                            var blob = oReq.response;
+
+                                            var new_zip = new JSZip();
+                                            new_zip.loadAsync(blob).then(function () {
+                                                // read in the first file in the zip file
+                                                Object.values(new_zip.files)[0].async("string").then(
+                                                    function (c) {
+                                                        c = JSON.parse(c);
+                                                        if (c.series) {
+                                                            for (var i = 0; i < c.series.length; i++) {
+                                                                d.push({
+                                                                    name: names[key] + ":" + c.series[i].name,
+                                                                    expDataRun: data,
+                                                                    index: i
+                                                                });
+                                                            }
+                                                        }
+                                                        if (Ext4.isFunction(callback))
+                                                            callback.call(this, c);
+                                                    }
+                                                );
+                                            });
+                                        };
+                                        oReq.send(null);
+                                    } catch (e) {
+                                        alert("Failed to Load File Contents");
+                                        if (Ext4.isFunction(callback))
+                                            callback.call(this);
+                                    }
+                                }
+                            };
+
+                            xhr.send(null);
+                        };
+
+                        for(var i=0; i<expected; i++) {
+                            getDataContent(names, runData, i, d, done);
                         }
                     },
                     scope: this
@@ -361,37 +497,4 @@ Ext4.define('LABKEY.SignalData.DataService', {
             scope: this
         });
     },
-
-    getDate : function(filePath) {
-        var date;
-
-        if (!Ext4.isEmpty(filePath)) {
-            var path = filePath.split('/');
-
-            var folder = "";
-            if (path.length == 1) {
-                folder = path[0]; // allows for the folder name to be handed in directly
-            }
-            else {
-                folder = path[path.length-2];
-            }
-
-            if (folder.indexOf('20') == 0) {
-                folder = folder.split('_');
-                date = new Date();
-                date.setDate(parseInt(folder[2])); // setDay
-                date.setFullYear(parseInt(folder[0]));
-                date.setMonth(parseInt(folder[1])-1);
-                date.setHours(parseInt(folder[3]));
-                date.setMinutes(parseInt(folder[4]));
-                date.setSeconds(parseInt(folder[5]));
-            }
-        }
-
-        if (!Ext4.isDefined(date)) {
-            Ext4.Msg.alert('Invalid Date requested for:', filePath);
-        }
-
-        return date;
-    }
 });
