@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Implementation-Title: signaldata
+Implementation-Version: 18.3
+Implementation-Vendor: LabKey
+

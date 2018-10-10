@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.0.xsd">
+    <bean id="moduleBean" class="org.labkey.signaldata.SignalDataModule">
+        <property name="name" value="signalData"/>
+        <property name="version" value="18.3"/>
+        <property name="requiredServerVersion" value="0.0"/>
+        <property name="moduleDependencies" value=""/>
+
+        <property name="label" value="signaldata"/>
+        <property name="description">
+          <value><![CDATA[A module defining general X/Y plottable assays and tools for working with those assays.]]></value>
+        </property>
+        <property name="url" value="https://github.com/LabKey/signalData"/>
+        <property name="author">
+          <value><![CDATA[]]></value>
+        </property>
+        <property name="maintainer">
+          <value><![CDATA[]]></value>
+        </property>
+        <property name="organization" value=""/>
+        <property name="organizationUrl" value=""/>
+        <property name="license" value="Apache 2.0"/>
+        <property name="licenseUrl" value="http://www.apache.org/licenses/LICENSE-2.0"/>
+
+        <property name="vcsRevision" value="4acac1e63e8d810dafc8159c2649e6669b18c321"/>
+        <property name="vcsUrl" value="https://github.com/LabKey/signalData.git"/>
+        <property name="buildUser" value="WIN-GJVER9ENROM$"/>
+        <property name="buildTime" value="Sep 5, 2018 10:01:46 AM"/>
+        <property name="buildOS" value="Windows Server 2012 R2"/>
+        <property name="buildPath" value="C:\labkey\apps\teamcity\agent\work\fda010b6abf32031\build\modules\signalData"/>
+        <property name="buildType" value="Production"/>
+        <property name="sourcePath" value=""/>
+        <property name="supportedDatabases" value=""/>
+        <property name="resourcePath" value=""/>
+        <property name="buildNumber" value="60014.60"/>
+        <property name="enlistmentId" value=""/>
+        <property name="consolidateScripts" value="true"/>
+        <property name="manageVersion" value="true"/>
+    </bean>
+</beans>

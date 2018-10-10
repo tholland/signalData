@@ -95,9 +95,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                                             callback.call(scope || this, content);
                                     }
                                 );
-                            });
-                            if (Ext4.isFunction(callback))
-                                callback.call(scope || this, content);
+                            });;
                         };
                         oReq.send(null);
                     } catch (e) {
@@ -256,6 +254,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                         var names = {};
                         var runData = {};
                         var d = [];
+                        var yAxes = [];
 
                         for (var j = 0; j < RunGroups.length; j++) {
                             var RunGroup = RunGroups[j];
@@ -306,6 +305,8 @@ Ext4.define('LABKEY.SignalData.DataService', {
 
                                 names[dataFile] = name;
                                 runData[dataFile] = run.properties['DataFile'];
+
+                                yAxes.push(RunGroup.properties['YAxis']);
                             }
                         }
 
@@ -316,6 +317,7 @@ Ext4.define('LABKEY.SignalData.DataService', {
                             received++;
                             if (received == expected) {
                                 context.rawInputs = d;
+                                context.yAxes = yAxes;
 
                                 if (Ext4.isFunction(callback)) {
                                     callback.call(scope || this, context);

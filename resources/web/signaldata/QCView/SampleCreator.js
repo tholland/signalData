@@ -326,7 +326,11 @@ Ext4.define('LABKEY.SignalData.SampleCreator', {
         return this.getAxisLabel('XAxis');
     },
     getYLabel: function(){
-        return this.getAxisLabel('YAxis');
+        var yAxis = this.context.yAxes.filter((v, i, a) => a.indexOf(v) === i).join(',');
+        if (yAxis == '') {
+            return this.getAxisLabel('YAxis');
+        }
+        return yAxis;
     },
 
     getAxisLabel: function(axisField) {
